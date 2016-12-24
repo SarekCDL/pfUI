@@ -3,7 +3,7 @@
 ## Author: Shagu, 2016
 ## Notes: A complete user interface replacement.
 ## Version: 0.1
-## SavedVariables: pfUI_playerDB
+## SavedVariables: pfUI_profiles, pfUI_playerDB
 ## SavedVariablesPerCharacter: pfUI_config, pfUI_init
 
 # main
@@ -17,8 +17,8 @@ env\locales_zhCN.lua
 env\locales_ruRU.lua
 
 # environment
+env\api.lua
 env\colors.lua
-env\functions.lua
 env\fonts.lua
 env\selldata.lua
 

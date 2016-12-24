@@ -36,27 +36,31 @@ pfLocaleSpellEvents = {}
 pfLocaleSpellInterrupts = {}
 
 pfUI:SetScript("OnEvent", function()
-  if not pfUI_init then
-    pfUI_init = {}
-  end
-
-  pfUI:LoadConfig()
-
-  -- reload environment
-  pfUI.environment:UpdateFonts()
-  pfUI.environment:UpdateColors()
-
-  -- fill the cache
-  pfUI.cache["locale"] = GetLocale()
-  if pfUI.cache["locale"] ~= "enUS" and
-     pfUI.cache["locale"] ~= "frFR" and
-     pfUI.cache["locale"] ~= "deDE" and
-     pfUI.cache["locale"] ~= "zhCN" and
-     pfUI.cache["locale"] ~= "ruRU" then
-     pfUI.cache["locale"] = "enUS"
-  end
-
   if arg1 == "pfUI" then
+    if not pfUI_init then
+      pfUI_init = {}
+    end
+
+    if not pfUI_profiles then
+      pfUI_profiles = {}
+    end
+
+    pfUI:LoadConfig()
+
+    -- reload environment
+    pfUI.environment:UpdateFonts()
+    pfUI.environment:UpdateColors()
+
+    -- fill the cache
+    pfUI.cache["locale"] = GetLocale()
+    if pfUI.cache["locale"] ~= "enUS" and
+       pfUI.cache["locale"] ~= "frFR" and
+       pfUI.cache["locale"] ~= "deDE" and
+       pfUI.cache["locale"] ~= "zhCN" and
+       pfUI.cache["locale"] ~= "ruRU" then
+       pfUI.cache["locale"] = "enUS"
+    end
+
     for i,m in pairs(this.modules) do
       -- do not load disabled modules
       if pfUI_config["disabled"] and pfUI_config["disabled"][m]  == "1" then
@@ -66,8 +70,6 @@ pfUI:SetScript("OnEvent", function()
       end
     end
   end
-
-
 end)
 
 function pfUI:RegisterModule(n, f)
@@ -90,89 +92,6 @@ pfUI.backdrop_underline = {
   edgeFile = "Interface\\AddOns\\pfUI\\img\\underline", edgeSize = 8,
   insets = {left = 0, right = 0, top = 0, bottom = 0},
 }
-
-pfUI.utils = CreateFrame("Frame",nil,UIParent)
-
-function pfUI.utils:UpdateMovable(frame)
-  local name = frame:GetName()
-
-  if not pfUI.movables[name] then
-    pfUI.movables[name] = true
-    table.insert(pfUI.movables, name)
-  end
-
-  if pfUI_config["position"][frame:GetName()] then
-    if pfUI_config["position"][frame:GetName()]["scale"] then
-      frame:SetScale(pfUI_config["position"][frame:GetName()].scale)
-    end
-
-    if pfUI_config["position"][frame:GetName()]["xpos"] then
-      frame:ClearAllPoints()
-      frame:SetPoint("TOPLEFT", pfUI_config["position"][frame:GetName()].xpos, pfUI_config["position"][frame:GetName()].ypos)
-    end
-  end
-end
-
-function pfUI.utils:CreateBackdrop(f, inset, legacy, transp)
-  -- use default inset if nothing is given
-  local border = inset
-  if not border then
-    border = tonumber(pfUI_config.appearance.border.default)
-  end
-
-  -- bg and edge colors
-  if not pfUI.cache.br then
-    local br, bg, bb, ba = strsplit(",", pfUI_config.appearance.border.background)
-    local er, eg, eb, ea = strsplit(",", pfUI_config.appearance.border.color)
-    pfUI.cache.br, pfUI.cache.bg, pfUI.cache.bb, pfUI.cache.ba = br, bg, bb, ba
-    pfUI.cache.er, pfUI.cache.eg, pfUI.cache.eb, pfUI.cache.ea = er, eg, eb, ea
-  end
-
-  local br, bg, bb, ba =  pfUI.cache.br, pfUI.cache.bg, pfUI.cache.bb, pfUI.cache.ba
-  local er, eg, eb, ea = pfUI.cache.er, pfUI.cache.eg, pfUI.cache.eb, pfUI.cache.ea
-  if transp then ba = .8 end
-
-  -- use legacy backdrop handling
-  if legacy then
-    f:SetBackdrop(pfUI.backdrop)
-    f:SetBackdropColor(br, bg, bb, ba)
-    f:SetBackdropBorderColor(er, eg, eb , ea)
-    return
-  end
-
-  -- increase clickable area if available
-  if f.SetHitRectInsets then
-    f:SetHitRectInsets(-border,-border,-border,-border)
-  end
-
-  -- use new backdrop behaviour
-  if not f.backdrop then
-    f:SetBackdrop(nil)
-
-    local border = tonumber(border) - 1
-    local backdrop = pfUI.backdrop
-    if border < 1 then backdrop = pfUI.backdrop_small end
-  	local b = CreateFrame("Frame", nil, f)
-  	b:SetPoint("TOPLEFT", f, "TOPLEFT", -border, border)
-  	b:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", border, -border)
-
-    local level = f:GetFrameLevel()
-    if level < 1 then
-  	  --f:SetFrameLevel(level + 1)
-      b:SetFrameLevel(level)
-    else
-      b:SetFrameLevel(level - 1)
-    end
-
-    f.backdrop = b
-    b:SetBackdrop(backdrop)
-  end
-
-  local b = f.backdrop
-  b:SetBackdropColor(br, bg, bb, ba)
-  b:SetBackdropBorderColor(er, eg, eb , ea)
-end
-
 
 message = function (msg)
   DEFAULT_CHAT_FRAME:AddMessage("|cffcccc33INFO: |cffffff55"..msg)
@@ -208,7 +127,7 @@ function pfUI.info:ShowInfoBox(text, time, parent, height)
 
   pfUI.info:SetWidth(pfUI.info.text:GetStringWidth() + 50)
   pfUI.info:SetHeight(height)
-  pfUI.utils:CreateBackdrop(pfUI.info)
+  pfUI.api:CreateBackdrop(pfUI.info)
   pfUI.info:SetPoint("TOP", 0, -25)
 
   pfUI.info.timeout:ClearAllPoints()
