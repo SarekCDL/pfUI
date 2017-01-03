@@ -86,7 +86,7 @@ pfUI:RegisterModule("thirdparty", function ()
         pfUIhookWIM_PostMessage = WIM_PostMessage
         WIM_PostMessage = function(user, msg, ttype, from, raw_msg)
           pfUIhookWIM_PostMessage(user, msg, ttype, from, raw_msg)
-          pfUI.api:CreateBackdrop(getglobal("WIM_msgFrame" .. user))
+          pfUI.api:CreateBackdrop(getglobal("WIM_msgFrame" .. user), nil, nil, true)
           getglobal("WIM_msgFrame" .. user .. "From"):ClearAllPoints()
           getglobal("WIM_msgFrame" .. user .. "From"):SetPoint("TOP", 0, -10)
 
@@ -157,7 +157,7 @@ pfUI:RegisterModule("thirdparty", function ()
       local AceEvent = AceLibrary("AceEvent-2.0")
 
       function pfUI.healComm.createIncHeal(unit)
-        if unit == "player" then
+        if pfUI.uf.player and unit == "player" then
           if pfUI.uf.player and not pfUI.uf.player.incHeal then
             pfUI.uf.player.incHeal = CreateFrame("StatusBar", "PlayerFrameIncHealBar", pfUI.uf.player)
             pfUI.uf.player.incHeal:SetStatusBarTexture("Interface\\AddOns\\pfUI\\img\\bar")
@@ -170,7 +170,7 @@ pfUI:RegisterModule("thirdparty", function ()
           return pfUI.uf.player
         end
 
-        if unit == "target" then
+        if pfUI.uf.target and unit == "target" then
           if pfUI.uf.target and not pfUI.uf.target.incHeal then
             pfUI.uf.target.incHeal = CreateFrame("StatusBar", "PlayerFrameIncHealBar", pfUI.uf.target)
             pfUI.uf.target.incHeal:SetStatusBarTexture("Interface\\AddOns\\pfUI\\img\\bar")
@@ -183,7 +183,7 @@ pfUI:RegisterModule("thirdparty", function ()
           return pfUI.uf.target
         end
 
-        if strsub(unit,0,5) == "party" then
+        if pfUI.uf.group and strsub(unit,0,5) == "party" then
           local id = tonumber(strsub(unit,6))
           if pfUI.uf.group[id] and not pfUI.uf.group[id].incHeal then
             pfUI.uf.group[id].incHeal = CreateFrame("StatusBar", "PlayerFrameIncHealBar", pfUI.uf.group[id])
@@ -197,7 +197,7 @@ pfUI:RegisterModule("thirdparty", function ()
           return pfUI.uf.group[id]
         end
 
-        if strsub(unit,0,4) == "raid" then
+        if pfUI.uf.raid and strsub(unit,0,4) == "raid" then
           local rid = tonumber(strsub(unit,5))
           local id = nil
 
@@ -388,6 +388,84 @@ pfUI:RegisterModule("thirdparty", function ()
           if Clean_Up then
             pfHookClean_Up:UnregisterEvent("VARIABLES_LOADED")
             pfSetupClean_Up()
+          end
+        end)
+    end
+  end
+
+  local function pfSetupKTM()
+    -- use pfUI border for main window
+    pfUI.api:CreateBackdrop(KLHTM_Frame)
+
+    -- remove titlebar
+    KLHTM_Gui.title.back:Hide()
+
+    -- theme buttons
+    local buttons = { "KLHTM_TitleFrameClose", "KLHTM_TitleFrameMinimise",
+    "KLHTM_TitleFrameMaximise", "KLHTM_TitleFrameOptions", "KLHTM_TitleFramePin",
+    "KLHTM_TitleFrameUnpin", "KLHTM_TitleFrameSelfView", "KLHTM_TitleFrameRaidView",
+    "KLHTM_TitleFrameMasterTarget", "KLHTM_SelfFrameBottomReset" }
+
+    for i, button in pairs(buttons) do
+      local b = getglobal(button)
+      if not b then return end
+      pfUI.api:SkinButton(b)
+      b:SetScale(.8)
+
+      -- remove red background on some buttons
+      for i,v in ipairs({b:GetRegions()}) do
+        if v.SetTexture and i == 1 then
+          v:SetTexture(0,0,0,0)
+        end
+      end
+
+      local p,rt,rp,xo,yo = b:GetPoint()
+      if not b.pfSet and i > 1 then
+        b:SetPoint(p,rt,rp,xo - 3,yo)
+        b.pfSet = true
+      end
+    end
+
+    -- name buttons
+    KLHTM_TitleFrameClose:SetText("x")
+    KLHTM_TitleFrameMinimise:SetText("_")
+    KLHTM_TitleFrameMaximise:SetText("_")
+    KLHTM_TitleFrameOptions:SetText("O")
+    KLHTM_TitleFramePin:SetText("P")
+    KLHTM_TitleFrameUnpin:SetText("U")
+    KLHTM_TitleFrameSelfView:SetText("S")
+    KLHTM_TitleFrameRaidView:SetText("R")
+    KLHTM_TitleFrameMasterTarget:SetText("T")
+
+    -- skin rows (raid)
+    for i in pairs(KLHTM_Gui.raid.rows) do
+      KLHTM_Gui.raid.rows[i].bar:SetTexture("Interface\\AddOns\\pfUI\\img\\bar")
+      KLHTM_Gui.raid.rows[i].bar:SetAlpha(.75)
+    end
+
+    -- skin rows (self)
+    for i in pairs(KLHTM_Gui.self.rows) do
+      KLHTM_Gui.self.rows[i].bar:SetTexture("Interface\\AddOns\\pfUI\\img\\bar")
+      KLHTM_Gui.self.rows[i].bar:SetAlpha(.75)
+    end
+
+    -- remove seperators
+    if KLHTM_RaidFrameLine then KLHTM_RaidFrameLine:Hide() end
+    if KLHTM_RaidFrameBottomLine then KLHTM_RaidFrameBottomLine:Hide() end
+    if KLHTM_SelfFrameLine then KLHTM_SelfFrameLine:Hide() end
+    if KLHTM_SelfFrameBottomLine then KLHTM_SelfFrameBottomLine:Hide() end
+  end
+
+  if pfUI_config.thirdparty.ktm.enable == "1" then
+    if KLHTM_Gui then
+      pfSetupKTM()
+    else
+      local pfHookKTM = CreateFrame("Frame", nil)
+      pfHookKTM:RegisterEvent("VARIABLES_LOADED")
+      pfHookKTM:SetScript("OnEvent",function()
+          if KLHTM_Gui then
+            pfHookKTM:UnregisterEvent("VARIABLES_LOADED")
+            pfSetupKTM()
           end
         end)
     end

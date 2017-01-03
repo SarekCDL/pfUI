@@ -21,6 +21,19 @@ function pfUI.api.strsplit(delimiter, subject)
   end
 end
 
+-- [ strvertical ]
+-- Creates vertical text using linebreaks. Multibyte char friendly.
+-- 'str'        [string]        String to columnize.
+-- return:      [string]        the string tranformed to a column.
+function pfUI.api.strvertical(str)
+    local _, len = string.gsub(str,"[^\128-\193]", "")
+    if (len == string.len(str)) then
+      return string.gsub(str, "(.)", "%1\n")
+    else
+      return string.gsub(str,"([%z\1-\127\194-\244][\128-\191]*)", "%1\n")
+    end
+end
+
 -- [ round ]
 -- Rounds a float number into specified places after comma.
 -- 'input'      [float]         the number that should be rounded.
@@ -185,11 +198,15 @@ function pfUI.api:SkinButton(button, cr, cg, cb)
   b:SetHighlightTexture(nil)
   b:SetPushedTexture(nil)
   b:SetDisabledTexture(nil)
+  local funce = b:GetScript("OnEnter")
+  local funcl = b:GetScript("OnLeave")
   b:SetScript("OnEnter", function()
+    if funce then funce() end
     pfUI.api:CreateBackdrop(b, nil, true)
     b:SetBackdropBorderColor(cr,cg,cb,1)
   end)
   b:SetScript("OnLeave", function()
+    if funcl then funcl() end
     pfUI.api:CreateBackdrop(b, nil, true)
   end)
   b:SetFont(pfUI.font_default, pfUI_config.global.font_size, "OUTLINE")
@@ -210,25 +227,14 @@ function pfUI.api:CreateQuestionDialog(text, yes, no, editbox)
     return
   end
 
-  -- add default values
-  if not yes then
-    yes = function() message("You clicked OK") end
-  end
-
-  if not no then
-    no = function() this:GetParent():Hide() end
-  end
-
-  if not text then
-    text = "Are you sure?"
-  end
+  if not text then text = "Are you sure?" end
 
   local border = tonumber(pfUI_config.appearance.border.default)
   local padding = 15
+
   -- frame
   local question = CreateFrame("Frame", "pfQuestionDialog", UIParent)
-  question:SetWidth(300)
-  question:SetHeight(100)
+  question:ClearAllPoints()
   question:SetPoint("CENTER", 0, 0)
   question:SetFrameStrata("TOOLTIP")
   question:SetMovable(true)
@@ -245,9 +251,9 @@ function pfUI.api:CreateQuestionDialog(text, yes, no, editbox)
   -- text
   question.text = question:CreateFontString("Status", "LOW", "GameFontNormal")
   question.text:SetFontObject(GameFontWhite)
-  question.text:SetPoint("TOP", 0, -padding)
+  question.text:SetPoint("TOPLEFT", question, "TOPLEFT", padding, -padding)
+  question.text:SetPoint("TOPRIGHT", question, "TOPRIGHT", -padding, -padding)
   question.text:SetText(text)
-  question.text:SetWidth(question:GetWidth() - border * 2)
 
   -- editbox
   if editbox then
@@ -270,7 +276,10 @@ function pfUI.api:CreateQuestionDialog(text, yes, no, editbox)
   question.yes:SetWidth(100)
   question.yes:SetHeight(20)
   question.yes:SetText("Okay")
-  question.yes:SetScript("OnClick", yes)
+  question.yes:SetScript("OnClick", function()
+    if yes then yes() end
+    this:GetParent():Hide()
+  end)
 
   if question.input then
     question.yes:SetPoint("TOPLEFT", question.input, "BOTTOMLEFT", -border, -padding)
@@ -283,7 +292,10 @@ function pfUI.api:CreateQuestionDialog(text, yes, no, editbox)
   question.no:SetWidth(85)
   question.no:SetHeight(20)
   question.no:SetText("Cancel")
-  question.no:SetScript("OnClick", no)
+  question.no:SetScript("OnClick", function()
+    if no then no() end
+    this:GetParent():Hide()
+  end)
 
   if question.input then
     question.no:SetPoint("TOPRIGHT", question.input, "BOTTOMRIGHT", border, -padding)
@@ -318,5 +330,103 @@ function pfUI.api:CreateQuestionDialog(text, yes, no, editbox)
   local inputspace = 0
   if question.input then inputspace = question.input:GetHeight() + padding end
   local buttonspace = question.no:GetHeight() + padding
-  question:SetHeight(textspace + inputspace + buttonspace + border)
+  question:SetHeight(textspace + inputspace + buttonspace + padding)
+
+  local width = 200
+  if question.text:GetStringWidth() > 200 then width = question.text:GetStringWidth() end
+  question:SetWidth( width + 2*padding)
+end
+
+-- [ Bar Layout Options ] --
+-- 'barsize'  size of bar in number of buttons
+-- returns:   array of options as strings for pfUI.gui.bar
+function pfUI.api:BarLayoutOptions(barsize)
+  assert(barsize > 0 and barsize <= NUM_ACTIONBAR_BUTTONS,"BarLayoutOptions: barsize "..tostring(barsize).." is invalid")
+  local options = {}
+  for i,layout in ipairs(pfGridmath[barsize]) do
+    options[i] = string.format("%d x %d",layout[1],layout[2])
+  end
+  return options
+end
+
+-- [ Bar Layout Formfactor ] --
+-- 'option'  string option as used in pfUI_config.bars[bar].option
+-- returns:  integer formfactor
+local formfactors = {} -- we'll use memoization so we only compute once, then lookup.
+setmetatable(formfactors, {__mode = "v"}) -- weak table so values not referenced are collected on next gc
+function pfUI.api:BarLayoutFormfactor(option)
+  if formfactors[option] then
+    return formfactors[option]
+  else
+    for barsize,_ in ipairs(pfGridmath) do
+      local options = pfUI.api:BarLayoutOptions(barsize)
+      for i,opt in ipairs(options) do
+        if opt == option then
+          formfactors[option] = i
+          return formfactors[option]
+        end
+      end
+    end
+  end
+end
+
+-- [ Bar Layout Size ] --
+-- 'bar'  frame reference,
+-- 'barsize'  integer number of buttons,
+-- 'formfactor'  string formfactor in cols x rows
+function pfUI.api:BarLayoutSize(bar,barsize,formfactor,iconsize,bordersize)
+  assert(barsize > 0 and barsize <= NUM_ACTIONBAR_BUTTONS,"BarLayoutSize: barsize "..tostring(barsize).." is invalid")
+  local formfactor = pfUI.api:BarLayoutFormfactor(formfactor)
+  local cols, rows = unpack(pfGridmath[barsize][formfactor])
+  local width = (iconsize + bordersize*3) * cols - bordersize
+  local height = (iconsize + bordersize*3) * rows - bordersize
+  bar._size = {width,height}
+  return bar._size
+end
+
+-- [ Bar Button Anchor ] --
+-- 'button'  frame reference
+-- 'basename'  name of button frame without index
+-- 'buttonindex'  index number of button on bar
+-- 'formfactor'  string formfactor in cols x rows
+function pfUI.api:BarButtonAnchor(button,basename,buttonindex,barsize,formfactor,iconsize,bordersize)
+  assert(barsize > 0 and barsize <= NUM_ACTIONBAR_BUTTONS,"BarButtonAnchor: barsize "..tostring(barsize).." is invalid")
+  local formfactor = pfUI.api:BarLayoutFormfactor(formfactor)
+  local parent = button:GetParent()
+  local cols, rows = unpack(pfGridmath[barsize][formfactor])
+  if buttonindex == 1 then
+    button._anchor = {"TOPLEFT", parent, "TOPLEFT", bordersize, -bordersize}
+  else
+    local col = buttonindex-((math.ceil(buttonindex/cols)-1)*cols)
+    button._anchor = col==1 and {"TOP",getglobal(basename..(buttonindex-cols)),"BOTTOM",0,-(bordersize*3)} or {"LEFT",getglobal(basename..(buttonindex-1)),"RIGHT",(bordersize*3),0}
+  end
+  return button._anchor
+end
+
+-- [ Create Autohide ] --
+-- 'frame'  the frame that should be hidden
+function pfUI.api:CreateAutohide(frame)
+  if not frame then return end
+  frame.hover = CreateFrame("Frame", frame:GetName() .. "Autohide", frame)
+  frame.hover:SetParent(frame)
+  frame.hover:SetAllPoints(frame)
+  frame.hover.parent = frame
+
+  frame.hover:RegisterEvent("PLAYER_LEAVING_WORLD")
+  frame.hover:SetScript("OnEvent", function()
+    this:Hide()
+  end)
+
+  frame.hover:SetScript("OnUpdate", function()
+    if MouseIsOver(this, 10, -10, -10, 10) then
+      this.activeTo = GetTime() + tonumber(pfUI_config.bars.hide_time)
+      this.parent:SetAlpha(1)
+    elseif this.activeTo then
+      if this.activeTo < GetTime() and this.parent:GetAlpha() > 0 then
+        this.parent:SetAlpha(this.parent:GetAlpha() - 0.1)
+      end
+    else
+      this.activeTo = GetTime() + tonumber(pfUI_config.bars.hide_time)
+    end
+  end)
 end
