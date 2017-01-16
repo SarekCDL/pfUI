@@ -62,11 +62,12 @@ pfUI:RegisterModule("skin", function ()
 
 pfUI.api:CreateBackdrop(ShoppingTooltip1)
 pfUI.api:CreateBackdrop(ShoppingTooltip2)
+pfUI.api:CreateBackdrop(ItemRefTooltip)
 
 ShoppingTooltip1:SetScript("OnShow", function()
   local a, b, c, d, e = this:GetPoint()
   local border = tonumber(pfUI_config.appearance.border.default)
-  if not d or d == 0 then d = (border*2)+d+1 end
+  if d and d == 0 then d = (border*2)+d+1 end
   this:SetPoint(a, b, c, d, e)
 end)
 

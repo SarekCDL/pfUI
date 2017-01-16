@@ -138,6 +138,13 @@ function pfUI.uf:SetupBuffFilter()
     -- Healing Way
     table.insert(pfUI.uf.buffs, "interface\\icons\\spell_nature_healingway")
   end
+
+
+  -- [[ WARRIOR ]]
+  if myclass == "WARRIOR" and pfUI_config.unitframes.raid.buffs_buffs == "1" then
+    -- Battle Shout
+    table.insert(pfUI.uf.buffs, "interface\\icons\\ability_warrior_battleshout")
+  end
 end
 
 function pfUI.uf:RefreshUnit(unit)
@@ -301,6 +308,114 @@ function pfUI.uf:RefreshUnit(unit)
   end
 end
 
+function pfUI.uf:CreatePortrait(frame, pos, spacing)
+  if not frame then return end
+  if pos == "off" then return end
+
+  local default_border = pfUI_config.appearance.border.default
+  if pfUI_config.appearance.border.unitframes ~= "-1" then
+    default_border = pfUI_config.appearance.border.unitframes
+  end
+
+  local unit = frame.label
+  local id = frame.id or ""
+  local unitstr = unit .. id
+
+  frame.portrait = CreateFrame("Frame", "pfPortrait" .. unitstr, frame)
+  frame.portrait:RegisterEvent("UNIT_PORTRAIT_UPDATE")
+  frame.portrait:RegisterEvent("UNIT_MODEL_CHANGED")
+  frame.portrait:RegisterEvent("PLAYER_ENTERING_WORLD")
+  frame.portrait:RegisterEvent("PLAYER_TARGET_CHANGED")
+  frame.portrait:RegisterEvent("PARTY_MEMBERS_CHANGED")
+
+  frame.portrait.base = frame
+  frame.portrait.pos = pos
+
+  frame.portrait.tex = frame.portrait:CreateTexture("pfPortraitTexture" .. unitstr, "OVERLAY")
+  frame.portrait.tex:SetAllPoints(frame.portrait)
+  frame.portrait.tex:SetTexCoord(.1, .9, .1, .9)
+
+  frame.portrait.model = CreateFrame("PlayerModel", "pfPortraitModel" .. unitstr, frame.portrait)
+  frame.portrait.model:SetAllPoints(frame.portrait)
+
+  frame.portrait:SetScript("OnEvent", function()
+    local unit = this.base.label
+    local id = this.base.id or ""
+    local unitstr = unit .. id
+
+    if event == "PLAYER_ENTERING_WORLD" or
+      ( event == "PARTY_MEMBERS_CHANGED" and this.base.label and this.base.label == "party" ) or
+      ( unitstr == "target" and event == "PLAYER_TARGET_CHANGED" ) or
+      ( unitstr == "targettarget" and event == "PLAYER_TARGET_CHANGED" ) or
+      ( arg1 and arg1 == unitstr ) then
+      pfUI.uf:UpdatePortrait()
+    end
+  end)
+
+  frame.portrait:SetScript("OnShow", function()
+    pfUI.uf:UpdatePortrait()
+  end)
+
+  if pos == "bar" then
+    frame.portrait:SetParent(frame.hp.bar)
+    frame.portrait:SetAllPoints(frame.hp.bar)
+    frame.portrait:SetAlpha(pfUI_config.unitframes.portraitalpha)
+  elseif pos == "left" then
+    frame.portrait:SetWidth(frame:GetHeight())
+    frame.portrait:SetHeight(frame:GetHeight())
+    frame:SetWidth(frame:GetWidth() + default_border*2 + spacing + frame.portrait:GetWidth())
+    frame.portrait:SetPoint("LEFT", frame, "LEFT", 0, 0)
+
+    frame.hp:ClearAllPoints()
+    frame.hp:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    frame.power:ClearAllPoints()
+    frame.power:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+
+    pfUI.api:CreateBackdrop(frame.portrait)
+  elseif pos == "right" then
+    frame.portrait:SetWidth(frame:GetHeight())
+    frame.portrait:SetHeight(frame:GetHeight())
+    frame:SetWidth(frame:GetWidth() + default_border*2 + spacing + frame.portrait:GetWidth())
+    frame.portrait:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
+
+    frame.hp:ClearAllPoints()
+    frame.hp:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+    frame.power:ClearAllPoints()
+    frame.power:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+
+    pfUI.api:CreateBackdrop(frame.portrait)
+  end
+end
+
+function pfUI.uf:UpdatePortrait()
+  local unit = this.base.label
+  local id = this.base.id or ""
+  local unitstr = unit .. id
+  local name = UnitName(unitstr) or ""
+
+  if not UnitIsVisible(unitstr) or not UnitIsConnected(unitstr) then
+    if this.pos == "bar" then
+      this.tex:Hide()
+      this.model:Hide()
+    elseif pfUI_config.unitframes.portraittexture == "1" then
+      this.tex:Show()
+      this.model:Hide()
+      SetPortraitTexture(this.tex, unitstr)
+    else
+      this.tex:Hide()
+      this.model:Show()
+      this.model:SetModelScale(4.25)
+      this.model:SetPosition(0, 0, -1)
+      this.model:SetModel("Interface\\Buttons\\talktomequestionmark.mdx")
+    end
+  else
+    this.tex:Hide()
+    this.model:Show()
+    this.model:SetUnit(unitstr)
+    this.model:SetCamera(0)
+  end
+end
+
 function pfUI.uf:CreateUnit(unit)
   unit:RegisterEvent("UNIT_AURA")
   unit:RegisterEvent("UNIT_HEALTH")
@@ -315,16 +430,22 @@ function pfUI.uf:CreateUnit(unit)
   unit:RegisterEvent("UNIT_FOCUS")
 
   unit:RegisterEvent("RAID_ROSTER_UPDATE")
+  unit:RegisterEvent("PARTY_MEMBERS_CHANGED")
+
   unit:SetScript("OnShow", function ()
     pfUI.uf:RefreshUnit(this)
   end)
 
   unit:SetScript("OnEvent", function ()
+    if this.label == "party" and event == "PARTY_MEMBERS_CHANGED" then
+      pfUI.uf:RefreshUnit(this)
+    end
+
     if this.label == "raid" and event == "RAID_ROSTER_UPDATE" then
       pfUI.uf:RefreshUnit(this)
     end
 
-    if arg1 == this.label .. this.id then
+    if arg1 and arg1 == this.label .. this.id then
       pfUI.uf:RefreshUnit(this)
     end
   end)
